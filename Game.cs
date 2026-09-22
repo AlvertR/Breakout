@@ -1,5 +1,4 @@
 ﻿using Raylib_cs;
-using System;
 using System.Numerics;
 
 namespace Breakout
@@ -21,28 +20,36 @@ namespace Breakout
         public int FPS { get; set; }
         public float DeltaTime { get; set; } = 0;
         public GameStatus GameStatus { get; set; } = GameStatus.Start;
-        public float Score { get; set; } = 0f;
+        public int Score { get; set; } = 0;
         public Paddle Paddle {get; set;}
         public Ball Ball {get; set;}
+        public int DefaultMagnitudeVel { get; set; }
+        public int MaxMagnitudeVel { get; set; }
+        //public int MinMagnitudeVel { get; set; }
+        public int BaseSpeed { get; set; }
 
         public void LoadGame()
         {
             Raylib.InitWindow(this.WidthWindow, this.HeightWindow, this.Name);
             //Raylib.InitAudioDevice();
-            //string basePath = AppDomain.CurrentDomain.BaseDirectory;
+            string basePath = AppDomain.CurrentDomain.BaseDirectory;
 
-            //string fulPathIcon = Path.Combine(basePath, "Resources", "snake-icon-2.png");
-            //Image icon = Raylib.LoadImage(fulPathIcon);
-            //Raylib.ImageFormat(ref icon, PixelFormat.UncompressedR8G8B8A8);
-            //Raylib.SetWindowIcon(icon);
-            //Raylib.UnloadImage(icon);
+            string fulPathIcon = Path.Combine(basePath, "Resources", "break-icon.png");
+            Image icon = Raylib.LoadImage(fulPathIcon);
+            Raylib.ImageFormat(ref icon, PixelFormat.UncompressedR8G8B8A8);
+            Raylib.SetWindowIcon(icon);
+            Raylib.UnloadImage(icon);
 
             //string soundPath = Path.Combine(basePath, "Resource", "sound.mp3");
             //Sound hitBallSound = Raylib.LoadSound(soundPath);
             Raylib.SetTargetFPS(this.FPS);
 
-            this.Paddle = new Paddle(40,10,220,400,450);
-            this.Ball = new Ball(20, 350,300, 160);
+            DefaultMagnitudeVel = 160;
+            MaxMagnitudeVel = 200;
+            //MinMagnitudeVel = 140;
+            BaseSpeed = 226;
+            this.Paddle = new Paddle(100,20,225,370,550, 5);
+            this.Ball = new Ball(20,0,0, DefaultMagnitudeVel);
 
             while (!Raylib.WindowShouldClose())
             {
@@ -59,13 +66,26 @@ namespace Breakout
 
         public void HandleInput()
         {
+            float movement = 0;
             switch (GameStatus)
             {
                 case GameStatus.Start:
                     if (Raylib.IsKeyPressed(KeyboardKey.S))
+                    {
                         GameStatus = GameStatus.Playing;
+                        this.ResetBall();
+                    }
                     break;
                 case GameStatus.Playing:
+                    if (Raylib.IsKeyDown(KeyboardKey.Left) && Paddle.Position.X >=0)
+                        movement -= this.Paddle.Speed * DeltaTime;
+                    if (Raylib.IsKeyDown(KeyboardKey.Right) && (Paddle.Position.X + Paddle.Width) <= WidthWindow)
+                        movement += this.Paddle.Speed * DeltaTime;
+                    if (Raylib.IsKeyDown(KeyboardKey.Space))
+                        Ball.SetRunnig();
+                    float newX = Paddle.Position.X + movement;
+                    newX = Math.Clamp(newX, 0, WidthWindow -Paddle.Width);
+                    Paddle.SetPositionX(newX);
                     break;
                 case GameStatus.Paused:
                     break;
@@ -82,6 +102,7 @@ namespace Breakout
             switch (GameStatus)
             {
                 case GameStatus.Playing:
+                    this.MoveBall();
                     break;
                 default:
                     break;
@@ -100,12 +121,15 @@ namespace Breakout
                     break;
                 case GameStatus.Playing:
                     Raylib.DrawText("Puntos: " + Score.ToString(), 10, 5, 14, Color.White);
+                    Raylib.DrawText("Vidas: " + Paddle.Lifes.ToString(), WidthWindow-80, 5, 14, Color.White);
                     Raylib.DrawCircleV(Ball.Position, Ball.Radius, Color.White);
                     Raylib.DrawRectangleV(Paddle.Position, new Vector2(Paddle.Width, Paddle.Height), Color.White);
                     break;
                 case GameStatus.Paused:
                     break;
                 case GameStatus.GameOver:
+                    Raylib.DrawText("Fin del juego", 10, 5, 34, Color.White);
+                    Raylib.DrawText("Puntos: " + Score.ToString(), 10, 75, 14, Color.White);
                     break;
                 case GameStatus.End:
                     break;
@@ -113,6 +137,74 @@ namespace Breakout
                     break;
             }
             Raylib.EndDrawing();
+        }
+    
+        public void ResetBall()
+        {
+            Ball.SetPositionX(Paddle.Position.X + Paddle.Width / 2);
+            Ball.SetPositionY(Paddle.Position.Y - Ball.Radius);
+            Vector2 normalize = Vector2.Normalize(new Vector2(0 , Ball.DefaultMagnitudeVel * -1));
+            Ball.Velocity = normalize * BaseSpeed;
+        }
+
+        public void ChangeAngle()
+        {
+            float paddleCenter = Paddle.Position.X + (Paddle.Width / 2);
+            float impactPoint = (Ball.Position.X - paddleCenter) / (Paddle.Width / 2);
+            impactPoint = Math.Clamp(impactPoint, -1, 1);
+
+            float velocityX = impactPoint * MaxMagnitudeVel;
+            float velocityY = -Math.Abs(Ball.Velocity.Y);
+
+            Vector2 direction = Vector2.Normalize(new Vector2(velocityX, velocityY));
+            Ball.Velocity = direction * BaseSpeed;
+        }
+
+        public void MoveBall()
+        {
+            if (Ball.Statsus == BallStatsu.Running)
+            {
+                Ball.Position += Ball.Velocity * DeltaTime;
+                if (Ball.Position.Y <= 1 + Ball.Radius)
+                {
+                    Ball.SetVelocityY(Ball.Velocity.Y * -1);
+                }
+                if (Ball.Position.Y + Ball.Radius >= Paddle.Position.Y)
+                {
+                    if (Ball.Position.X + Ball.Radius >= Paddle.Position.X
+                        && Ball.Position.X - Ball.Radius <= Paddle.Position.X + Paddle.Width)
+                    {
+                        Ball.SetPositionY(Paddle.Position.Y - Ball.Radius);
+                        this.ChangeAngle();
+                    }
+                }
+                if (Ball.Position.Y >= HeightWindow - Ball.Radius - 1)
+                {
+                    Ball.SetStop();
+                    Paddle.Lifes--;
+                    if(this.IsGameOver())
+                        GameStatus = GameStatus.GameOver;
+                    else
+                        this.ResetBall();
+                }
+
+                if (Ball.Position.X <= 1 + Ball.Radius || Ball.Position.X >= WidthWindow - Ball.Radius - 1)
+                {
+                    Ball.SetVelocityX(Ball.Velocity.X * -1);
+                }
+            }
+            else
+            {
+                //Ball.SetPositionX(Paddle.Position.X+Paddle.Width/2);
+                this.ResetBall();
+            }
+        }
+
+        public bool IsGameOver()
+        {
+            if(Paddle.Lifes <= 0)
+                return true;
+            return false;
         }
     }
 }

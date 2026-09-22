@@ -8,4 +8,10 @@
         GameOver,
         End,
     }
+
+    public enum BallStatsu
+    {
+        Stop,
+        Running,
+    }
 }
