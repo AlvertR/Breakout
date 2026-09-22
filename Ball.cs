@@ -15,7 +15,7 @@ namespace Breakout
         public Vector2 Position { get; set; }
         public Vector2 Velocity { get; set; }
         public int DefaultMagnitudeVel { get; set; }
-        public BallStatsu Statsus { get; set; } = BallStatsu.Stop;
+        public BallStatus Status { get; set; } = BallStatus.Stop;
 
         public void SetVelocityY(float velocity)
         {
@@ -38,9 +38,9 @@ namespace Breakout
         }
 
         public void SetRunnig()
-            => this.Statsus = BallStatsu.Running;
+            => this.Status = BallStatus.Running;
 
         public void SetStop()
-            => this.Statsus = BallStatsu.Stop;
+            => this.Status = BallStatus.Stop;
     }
 }

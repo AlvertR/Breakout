@@ -9,9 +9,15 @@
         End,
     }
 
-    public enum BallStatsu
+    public enum BallStatus
     {
         Stop,
         Running,
+    }
+
+    public enum BrickStatus
+    {
+        Active,
+        Dead,
     }
 }
