@@ -8,4 +8,16 @@
         GameOver,
         End,
     }
+
+    public enum BallStatus
+    {
+        Stop,
+        Running,
+    }
+
+    public enum BrickStatus
+    {
+        Active,
+        Dead,
+    }
 }

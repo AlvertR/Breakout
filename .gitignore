@@ -1,1 +1,7 @@
-/.vs/Breakout/CopilotIndices/17.14.1577.30250
+/.vs
+/bin
+/obj
+
+.vs
+bin
+obj
