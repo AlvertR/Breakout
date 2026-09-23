@@ -24,17 +24,15 @@ namespace Breakout
         public Paddle Paddle {get; set;}
         public Ball Ball {get; set;}
         public List<Brick> BrickList {get; set;} = new List<Brick>();
-        public int DefaultMagnitudeVel { get; set; }
-        public int MaxMagnitudeVel { get; set; }
-        //public int MinMagnitudeVel { get; set; }
-        public int BaseSpeed { get; set; }
         public int Columns { get; set; } = 10;
         public int Rows { get; set; } = 10;
+        Sound HitBrickSound { get; set;}
+        Sound HitPaddleSound { get; set;}
 
         public void LoadGame()
         {
             Raylib.InitWindow(this.WidthWindow, this.HeightWindow, this.Name);
-            //Raylib.InitAudioDevice();
+            Raylib.InitAudioDevice();
             string basePath = AppDomain.CurrentDomain.BaseDirectory;
 
             string fulPathIcon = Path.Combine(basePath, "Resources", "break-icon.png");
@@ -43,16 +41,14 @@ namespace Breakout
             Raylib.SetWindowIcon(icon);
             Raylib.UnloadImage(icon);
 
-            //string soundPath = Path.Combine(basePath, "Resource", "sound.mp3");
-            //Sound hitBallSound = Raylib.LoadSound(soundPath);
+            string hitBrickSoundPath = Path.Combine(basePath, "Resources", "hit-brick.mp3");
+            string hitPaddleSoundPath = Path.Combine(basePath, "Resources", "hit-paddle.mp3");
+            HitBrickSound = Raylib.LoadSound(hitBrickSoundPath);
+            HitPaddleSound = Raylib.LoadSound(hitPaddleSoundPath);
             Raylib.SetTargetFPS(this.FPS);
 
-            DefaultMagnitudeVel = 160;
-            MaxMagnitudeVel = 200;
-            //MinMagnitudeVel = 140;
-            BaseSpeed = 226;
             this.Paddle = new Paddle(100,20,225,370,550, 5);
-            this.Ball = new Ball(20,0,0, DefaultMagnitudeVel);
+            this.Ball = new Ball(20,0,0, 160, 200, 226);
             this.SetBrickList();
 
             while (!Raylib.WindowShouldClose())
@@ -63,8 +59,9 @@ namespace Breakout
                 Draw();
             }
 
-            //Raylib.UnloadSound(hitBallSound);
-            //Raylib.CloseAudioDevice();
+            Raylib.UnloadSound(HitPaddleSound);
+            Raylib.UnloadSound(HitBrickSound);
+            Raylib.CloseAudioDevice();
             Raylib.CloseWindow();
         }
 
@@ -86,7 +83,7 @@ namespace Breakout
                     if (Raylib.IsKeyDown(KeyboardKey.Right) && (Paddle.Position.X + Paddle.Width) <= WidthWindow)
                         movement += this.Paddle.Speed * DeltaTime;
                     if (Raylib.IsKeyDown(KeyboardKey.Space))
-                        Ball.SetRunnig();
+                        Ball.SetRunning();
                     float newX = Paddle.Position.X + movement;
                     newX = Math.Clamp(newX, 0, WidthWindow -Paddle.Width);
                     Paddle.SetPositionX(newX);
@@ -96,9 +93,14 @@ namespace Breakout
                 case GameStatus.Paused:
                     if (Raylib.IsKeyDown(KeyboardKey.C))
                         GameStatus = GameStatus.Playing;
-                        break;
+                    break;
                 case GameStatus.GameOver:
                 case GameStatus.End:
+                    if (Raylib.IsKeyDown(KeyboardKey.R))
+                    {
+                        this.ResetGame();
+                        GameStatus = GameStatus.Playing;
+                    }
                     break;
                 default: 
                     break;
@@ -107,17 +109,17 @@ namespace Breakout
 
         public void Update()
         {
-            switch (GameStatus)
-            {
-                case GameStatus.Playing:
-                    this.MoveBall();
-                    this.CheckCollision();
-                    if (this.IsLavelComplete())
-                        GameStatus = GameStatus.End;
-                    break;
-                default:
-                    break;
-            }
+            if (GameStatus != GameStatus.Playing)
+                return;
+
+            this.MoveBall();
+            if (GameStatus != GameStatus.Playing)
+                return;
+
+            this.CheckCollision();
+
+            if (this.IsLevelComplete())
+                GameStatus = GameStatus.End;
         }
 
         public void Draw()
@@ -150,9 +152,11 @@ namespace Breakout
                 case GameStatus.GameOver:
                     Raylib.DrawText("Fin del juego", 10, 5, 34, Color.White);
                     Raylib.DrawText("Puntos: " + Score.ToString(), 10, 75, 14, Color.White);
+                    Raylib.DrawText("Presiona R para jugar de nuevo", 10, 100, 14, Color.White);
                     break;
                 case GameStatus.End:
                     Raylib.DrawText("Nivel completado", 10, 5, 34, Color.White);
+                    Raylib.DrawText("Presiona R para jugar de nuevo", 10, 75, 14, Color.White);
                     break;
                 default:
                     break;
@@ -165,7 +169,7 @@ namespace Breakout
             Ball.SetPositionX(Paddle.Position.X + Paddle.Width / 2);
             Ball.SetPositionY(Paddle.Position.Y - Ball.Radius);
             Vector2 normalize = Vector2.Normalize(new Vector2(0 , Ball.DefaultMagnitudeVel * -1));
-            Ball.Velocity = normalize * BaseSpeed;
+            Ball.Velocity = normalize * Ball.BaseSpeed;
         }
 
         public void ChangeAngle()
@@ -174,11 +178,11 @@ namespace Breakout
             float impactPoint = (Ball.Position.X - paddleCenter) / (Paddle.Width / 2);
             impactPoint = Math.Clamp(impactPoint, -1, 1);
 
-            float velocityX = impactPoint * MaxMagnitudeVel;
+            float velocityX = impactPoint * Ball.MaxMagnitudeVel;
             float velocityY = -Math.Abs(Ball.Velocity.Y);
 
             Vector2 direction = Vector2.Normalize(new Vector2(velocityX, velocityY));
-            Ball.Velocity = direction * BaseSpeed;
+            Ball.Velocity = direction * Ball.BaseSpeed;
         }
 
         public void MoveBall()
@@ -196,6 +200,7 @@ namespace Breakout
                         && Ball.Position.X - Ball.Radius <= Paddle.Position.X + Paddle.Width)
                     {
                         Ball.SetPositionY(Paddle.Position.Y - Ball.Radius);
+                        Raylib.PlaySound(HitPaddleSound);
                         this.ChangeAngle();
                     }
                 }
@@ -216,7 +221,6 @@ namespace Breakout
             }
             else
             {
-                //Ball.SetPositionX(Paddle.Position.X+Paddle.Width/2);
                 this.ResetBall();
             }
         }
@@ -227,7 +231,7 @@ namespace Breakout
                 return true;
             return false;
         }
-        public bool IsLavelComplete()
+        public bool IsLevelComplete()
         {
             var activeBricks = BrickList.Count(b => b.Status == BrickStatus.Active);
             if (activeBricks == 0)
@@ -245,37 +249,9 @@ namespace Breakout
                     float posX = c * brickWidth;
                     float posY = (r * brickHeight) + 30;
                     Brick newBrick = new Brick(brickHeight, brickWidth, posX,posY);
-                    newBrick.Color = this.GetBrickColor(r);
+                    newBrick.SetBrickColor(r);
                     this.BrickList.Add(newBrick);
                 }
-        }
-
-        public Color GetBrickColor(int row)
-        {
-            switch (row) { 
-                case 0:
-                    return Color.FromHSV(8, 99 , 40);
-                case 1:
-                    return Color.FromHSV(17, 90, 59);
-                case 2:
-                    return Color.FromHSV(42, 97, 54);
-                case 3:
-                    return Color.FromHSV(56, 100, 51);
-                case 4:
-                    return Color.FromHSV(67, 100, 45);
-                case 5:
-                    return Color.FromHSV(79, 100, 41);
-                case 6:
-                    return Color.FromHSV(96, 100, 37);
-                case 7:
-                    return Color.FromHSV(120, 100, 33);
-                case 8:
-                    return Color.FromHSV(158, 99, 36);
-                case 9:
-                    return Color.FromHSV(181, 100, 40);
-                default:
-                    return Color.White;
-            }
         }
     
         public void CheckCollision()
@@ -299,12 +275,22 @@ namespace Breakout
                         Ball.SetVelocityX(Ball.Velocity.X * -1);
                     else
                         Ball.SetVelocityY(Ball.Velocity.Y * -1);
-
+                    Raylib.PlaySound(HitBrickSound);
                     brick.Status = BrickStatus.Dead;
                     this.Score++;
                     break;
                 }
             }
+        }
+    
+        public void ResetGame()
+        {
+            this.Paddle.SetPositionX(370);
+            this.Paddle.Lifes = 5;
+            this.Score = 0;
+            this.BrickList = new List<Brick>();
+            this.SetBrickList();
+            this.ResetBall();
         }
     }
 }
